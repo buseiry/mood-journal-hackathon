@@ -1,0 +1,20 @@
+{
+  "name": "Mood Lab",
+  "short_name": "MoodLab",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#071028",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='%237c3aed'/><stop offset='1' stop-color='%2306b6d4'/></linearGradient></defs><rect width='120' height='120' rx='24' fill='url(%23g)'/><g transform='translate(60,60)'><circle r='36' fill='%23ffffff'/><circle cx='-12' cy='-8' r='4' fill='%237c3aed'/><circle cx='12' cy='-8' r='4' fill='%237c3aed'/><path d='M-16 10 Q0 28 16 10' stroke='%237c3aed' stroke-width='4' fill='none' stroke-linecap='round'/></g></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='%237c3aed'/><stop offset='1' stop-color='%2306b6d4'/></linearGradient></defs><rect width='120' height='120' rx='24' fill='url(%23g)'/><g transform='translate(60,60)'><circle r='36' fill='%23ffffff'/><circle cx='-12' cy='-8' r='4' fill='%237c3aed'/><circle cx='12' cy='-8' r='4' fill='%237c3aed'/><path d='M-16 10 Q0 28 16 10' stroke='%237c3aed' stroke-width='4' fill='none' stroke-linecap='round'/></g></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
