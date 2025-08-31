@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -44,6 +44,8 @@
     .entry .time{font-size:12px;color:var(--muted)}
     .badge{padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px}
     .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:28px;background:rgba(10,14,20,0.92);color:white;padding:12px 18px;border-radius:12px;font-weight:600;display:none;z-index:40}
+    
+    /* Auth Modal Styles */
     .auth-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(7,16,40,0.92);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
     .auth-container{background:white;border-radius:16px;padding:28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
     .auth-tabs{display:flex;margin-bottom:22px;border-bottom:1px solid rgba(0,0,0,0.08)}
@@ -170,43 +172,478 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    // JavaScript for auth, analyze, charts, history, toast notifications
-    const API={analyze:'/analyze',history:'/history',login:'/login',signup:'/signup',logout:'/logout',user:'/user'};
-    const CANON={joy:'joy',happy:'joy',excited:'joy',surprise:'surprise',neutral:'neutral',sad:'sadness',sadness:'sadness',angry:'anger',anger:'anger',disgust:'disgust',fear:'fear'};
-    const EMOTIONS=['anger','disgust','fear','sadness','neutral','surprise','joy'];
-    const EMO_META={anger:{name:'Anger',emoji:'😡',color:'#ff6b6b'},disgust:{name:'Disgust',emoji:'🤢',color:'#8bc34a'},fear:{name:'Fear',emoji:'😨',color:'#ff9f1c'},sadness:{name:'Sad',emoji:'😢',color:'#3b82f6'},neutral:{name:'Neutral',emoji:'😐',color:'#94a3b8'},surprise:{name:'Surprise',emoji:'😲',color:'#a78bfa'},joy:{name:'Joy',emoji:'😄',color:'#f6c94c'}};
-    const VALUE_OF=EMOTIONS.reduce((a,k,i)=>(a[k]=i,a),{});
+    const API = { 
+      analyze: '/analyze', 
+      history: '/history',
+      login: '/login',
+      signup: '/signup',
+      logout: '/logout',
+      user: '/user'
+    };
 
-    const authModal=document.getElementById('authModal'),loginForm=document.getElementById('loginForm'),signupForm=document.getElementById('signupForm'),loginError=document.getElementById('loginError'),signupError=document.getElementById('signupError'),authTabs=document.querySelectorAll('.auth-tab'),authForms=document.querySelectorAll('.auth-form'),showAuthBtn=document.getElementById('showAuthBtn'),authRequired=document.getElementById('authRequired'),appContent=document.getElementById('appContent'),appRightPanel=document.getElementById('appRightPanel'),userMenu=document.getElementById('userMenu'),userAvatar=document.getElementById('userAvatar'),userEmail=document.getElementById('userEmail'),logoutBtn=document.getElementById('logoutBtn'),entryEl=document.getElementById('entry'),btnAnalyze=document.getElementById('btnAnalyze'),btnClear=document.getElementById('btnClear'),toastEl=document.getElementById('toast'),resultArea=document.getElementById('resultArea'),resEmoji=document.getElementById('resEmoji'),resLabel=document.getElementById('resLabel'),resFill=document.getElementById('resFill'),chips=document.getElementById('chips'),historyList=document.getElementById('historyList'),countPill=document.getElementById('countPill'),lastAnalyzed=document.getElementById('lastAnalyzed'),confidencePill=document.getElementById('confidencePill'),rawLabelCount=document.getElementById('rawLabelCount');
+    const CANON = { joy:'joy', happy:'joy', excited:'joy', surprise:'surprise', neutral:'neutral', sad:'sadness', sadness:'sadness', angry:'anger', anger:'anger', disgust:'disgust', fear:'fear' };
+    const EMOTIONS = ['anger','disgust','fear','sadness','neutral','surprise','joy'];
+    const EMO_META = {
+      anger:   {name:'Anger', emoji:'😡', color:'#ff6b6b'},
+      disgust: {name:'Disgust', emoji:'🤢', color:'#8bc34a'},
+      fear:    {name:'Fear', emoji:'😨', color:'#ff9f1c'},
+      sadness: {name:'Sad', emoji:'😢', color:'#3b82f6'},
+      neutral: {name:'Neutral', emoji:'😐', color:'#94a3b8'},
+      surprise:{name:'Surprise', emoji:'😲', color:'#a78bfa'},
+      joy:     {name:'Joy', emoji:'😄', color:'#f6c94c'}
+    };
+    const VALUE_OF = EMOTIONS.reduce((a,k,i)=> (a[k]=i,a), {});
 
-    let trendChart=null,freqChart=null,currentUser=null;
-
-    function showAuthModal(){authModal.style.display='flex';}
-    function hideAuthModal(){authModal.style.display='none';loginError.style.display='none';signupError.style.display='none';loginForm.reset();signupForm.reset();}
-    function switchAuthTab(tabName){authTabs.forEach(t=>t.classList.remove('active'));authForms.forEach(f=>f.classList.remove('active'));document.querySelector(`.auth-tab[data-tab="${tabName}"]`).classList.add('active');document.getElementById(`${tabName}Form`).classList.add('active');}
-    async function loginUser(email,password){try{const r=await fetch(API.login,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password}),credentials:'include'});const d=await r.json();if(r.ok){currentUser=d.user;updateUIForUser();hideAuthModal();showToast('Login successful');loadHistory();return true;}else{loginError.textContent=d.error||'Login failed';loginError.style.display='block';return false;}}catch(e){loginError.textContent='Network error. Please try again.';loginError.style.display='block';return false;}}
-    async function signupUser(email,password){try{const r=await fetch(API.signup,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password}),credentials:'include'});const d=await r.json();if(r.ok){currentUser=d.user;updateUIForUser();hideAuthModal();showToast('Account created successfully');loadHistory();return true;}else{signupError.textContent=d.error||'Signup failed';signupError.style.display='block';return false;}}catch(e){signupError.textContent='Network error. Please try again.';signupError.style.display='block';return false;}}
-    async function logoutUser(){try{await fetch(API.logout,{method:'POST',credentials:'include'});}catch(e){console.error(e);}finally{currentUser=null;updateUIForUser();showToast('Logged out successfully');}}
-    async function checkAuthStatus(){try{const r=await fetch(API.user,{credentials:'include'});if(r.ok){const d=await r.json();currentUser=d.user;updateUIForUser();loadHistory();return true;}}catch(e){console.error(e);}currentUser=null;updateUIForUser();return false;}
-    function updateUIForUser(){if(currentUser){authRequired.style.display='none';appContent.style.display='block';appRightPanel.style.display='flex';userMenu.style.display='flex';userAvatar.textContent=currentUser.email.charAt(0).toUpperCase();userEmail.textContent=currentUser.email;authModal.style.display='none';}else{authRequired.style.display='block';appContent.style.display='none';appRightPanel.style.display='none';userMenu.style.display='none';historyList.innerHTML='';countPill.textContent='Entries: —';authModal.style.display='flex';}}
-    authTabs.forEach(t=>t.addEventListener('click',()=>switchAuthTab(t.dataset.tab)));
-    loginForm.addEventListener('submit',async e=>{e.preventDefault();await loginUser(document.getElementById('loginEmail').value,document.getElementById('loginPassword').value);});
-    signupForm.addEventListener('submit',async e=>{e.preventDefault();await signupUser(document.getElementById('signupEmail').value,document.getElementById('signupPassword').value);});
-    showAuthBtn.addEventListener('click',showAuthModal);
-    logoutBtn.addEventListener('click',logoutUser);
-
-    function showToast(msg){toastEl.textContent=msg;toastEl.style.display='block';setTimeout(()=>{toastEl.style.display='none'},3000);}
-    function updateResultUI(emotion,score,details){resEmoji.textContent=EMO_META[emotion].emoji;resLabel.textContent=EMO_META[emotion].name;resFill.style.width=`${Math.floor(score*100)}%`;chips.innerHTML='';Object.entries(details).forEach(([k,v])=>{const chip=document.createElement('div');chip.className='chip';chip.textContent=`${EMO_META[k].emoji} ${EMO_META[k].name}: ${Math.floor(v*100)}%`;chips.appendChild(chip);});resultArea.style.display='flex';}
-    async function analyzeEntry(){const text=entryEl.value.trim();if(!text){showToast('Please write something first');return;}try{const r=await fetch(API.analyze,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text}),credentials:'include'});const d=await r.json();if(r.ok){const main=d.main;updateResultUI(main.emotion,main.score,main.details);lastAnalyzed.textContent=new Date().toLocaleTimeString();confidencePill.textContent=Math.floor(main.score*100)+'%';loadHistory();}else{showToast('Analysis failed');}}catch(e){showToast('Network error');}}
-    btnAnalyze.addEventListener('click',analyzeEntry);
-    btnClear.addEventListener('click',()=>{entryEl.value='';resultArea.style.display='none';});
-
-    async function loadHistory(){try{const r=await fetch(API.history,{credentials:'include'});const d=await r.json();if(r.ok){historyList.innerHTML='';countPill.textContent='Entries: '+d.entries.length;const trendLabels=[],trendData=[],freqData={};EMOTIONS.forEach(e=>freqData[e]=0);d.entries.forEach(e=>{trendLabels.push(new Date(e.date).toLocaleDateString());trendData.push(VALUE_OF[e.emotion]||0);freqData[e.emotion]=(freqData[e.emotion]||0)+1;const div=document.createElement('div');div.className='entry';div.innerHTML=`<div class="text">${e.text}</div><div class="time">${new Date(e.date).toLocaleTimeString()}</div>`;historyList.appendChild(div);});renderTrendChart(trendLabels,trendData);renderFreqChart(freqData);}}catch(e){console.error(e);}}
+    // DOM Elements
+    const authModal = document.getElementById('authModal');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginError = document.getElementById('loginError');
+    const signupError = document.getElementById('signupError');
+    const authTabs = document.querySelectorAll('.auth-tab');
+    const authForms = document.querySelectorAll('.auth-form');
+    const showAuthBtn = document.getElementById('showAuthBtn');
+    const authRequired = document.getElementById('authRequired');
+    const appContent = document.getElementById('appContent');
+    const appRightPanel = document.getElementById('appRightPanel');
+    const userMenu = document.getElementById('userMenu');
+    const userAvatar = document.getElementById('userAvatar');
+    const userEmail = document.getElementById('userEmail');
+    const logoutBtn = document.getElementById('logoutBtn');
     
-    function renderTrendChart(labels,data){if(trendChart)trendChart.destroy();const ctx=document.getElementById('trendChart').getContext('2d');trendChart=new Chart(ctx,{type:'line',data:{labels, datasets:[{label:'Mood',data:data,borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.2)',tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{stepSize:1,callback:v=>EMOTIONS[v]||''}}}}});}
-    function renderFreqChart(freq){if(freqChart)freqChart.destroy();const ctx=document.getElementById('freqChart').getContext('2d');freqChart=new Chart(ctx,{type:'bar',data:{labels:EMOTIONS.map(e=>EMO_META[e].name),datasets:[{label:'Frequency',data:EMOTIONS.map(e=>freq[e]),backgroundColor:EMOTIONS.map(e=>EMO_META[e].color)}]},options:{responsive:true,plugins:{legend:{display:false}}}});}
+    const entryEl = document.getElementById('entry');
+    const btnAnalyze = document.getElementById('btnAnalyze');
+    const btnClear = document.getElementById('btnClear');
+    const toastEl = document.getElementById('toast');
+    const resultArea = document.getElementById('resultArea');
+    const resEmoji = document.getElementById('resEmoji');
+    const resLabel = document.getElementById('resLabel');
+    const resFill = document.getElementById('resFill');
+    const chips = document.getElementById('chips');
+    const historyList = document.getElementById('historyList');
+    const countPill = document.getElementById('countPill');
+    const lastAnalyzed = document.getElementById('lastAnalyzed');
+    const confidencePill = document.getElementById('confidencePill');
+    const rawLabelCount = document.getElementById('rawLabelCount');
+
+    let trendChart=null, freqChart=null;
+    let currentUser = null;
+
+    // Authentication Functions
+    function showAuthModal() {
+      authModal.style.display = 'flex';
+    }
+
+    function hideAuthModal() {
+      authModal.style.display = 'none';
+      loginError.style.display = 'none';
+      signupError.style.display = 'none';
+      loginForm.reset();
+      signupForm.reset();
+    }
+
+    function switchAuthTab(tabName) {
+      authTabs.forEach(tab => tab.classList.remove('active'));
+      authForms.forEach(form => form.classList.remove('active'));
+      
+      document.querySelector(`.auth-tab[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`${tabName}Form`).classList.add('active');
+    }
+
+    async function loginUser(email, password) {
+      try {
+        const response = await fetch(API.login, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          currentUser = data.user;
+          updateUIForUser();
+          hideAuthModal();
+          showToast('Login successful');
+          loadHistory();
+          return true;
+        } else {
+          loginError.textContent = data.error || 'Login failed';
+          loginError.style.display = 'block';
+          return false;
+        }
+      } catch (error) {
+        loginError.textContent = 'Network error. Please try again.';
+        loginError.style.display = 'block';
+        return false;
+      }
+    }
+
+    async function signupUser(email, password) {
+      try {
+        const response = await fetch(API.signup, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          currentUser = data.user;
+          updateUIForUser();
+          hideAuthModal();
+          showToast('Account created successfully');
+          loadHistory();
+          return true;
+        } else {
+          signupError.textContent = data.error || 'Signup failed';
+          signupError.style.display = 'block';
+          return false;
+        }
+      } catch (error) {
+        signupError.textContent = 'Network error. Please try again.';
+        signupError.style.display = 'block';
+        return false;
+      }
+    }
+
+    async function logoutUser() {
+      try {
+        await fetch(API.logout, { 
+          method: 'POST',
+          credentials: 'include'
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        currentUser = null;
+        updateUIForUser();
+        showToast('Logged out successfully');
+      }
+    }
+
+    async function checkAuthStatus() {
+      try {
+        const response = await fetch(API.user, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          currentUser = data.user;
+          updateUIForUser();
+          loadHistory();
+          return true;
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      }
+      
+      currentUser = null;
+      updateUIForUser();
+      return false;
+    }
+
+    function updateUIForUser() {
+      if (currentUser) {
+        authRequired.style.display = 'none';
+        appContent.style.display = 'block';
+        appRightPanel.style.display = 'flex';
+        userMenu.style.display = 'flex';
+        userAvatar.textContent = currentUser.email.charAt(0).toUpperCase();
+        userEmail.textContent = currentUser.email;
+        authModal.style.display = 'none';
+      } else {
+        authRequired.style.display = 'block';
+        appContent.style.display = 'none';
+        appRightPanel.style.display = 'none';
+        userMenu.style.display = 'none';
+        historyList.innerHTML = '';
+        countPill.textContent = 'Entries: —';
+        authModal.style.display = 'flex';
+      }
+    }
+
+    // Auth Event Listeners
+    authTabs.forEach(tab => {
+      tab.addEventListener('click', () => switchAuthTab(tab.dataset.tab));
+    });
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      await loginUser(email, password);
+    });
+
+    signupForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('signupEmail').value;
+      const password = document.getElementById('signupPassword').value;
+      await signupUser(email, password);
+    });
+
+    showAuthBtn.addEventListener('click', showAuthModal);
+    logoutBtn.addEventListener('click', logoutUser);
+
+    authModal.addEventListener('click', (e) => {
+      if (e.target === authModal) hideAuthModal();
+    });
+
+    // App Functions
+    function showToast(msg, t=2500){ 
+      toastEl.textContent=msg; 
+      toastEl.style.display='block'; 
+      clearTimeout(window._t); 
+      window._t=setTimeout(()=>toastEl.style.display='none', t); 
+    }
+
+    function canon(label){ 
+      if(!label) return 'neutral'; 
+      const k=String(label).toLowerCase().trim(); 
+      return CANON[k] || k; 
+    }
     
-    checkAuthStatus();
+    async function safeJSON(res){ 
+      return res.json().catch(()=>({error:'invalid json'})); 
+    }
+
+    function renderResult(data){
+      if(!data || !data.emotion) return;
+      const raw = data.emotion; 
+      const label = canon(raw); 
+      const score = Number(data.score||0)/100;
+      const meta = EMO_META[label]||{name:label,emoji:'🙂',color:'#94a3b8'};
+      resultArea.style.display='flex';
+      resEmoji.textContent=meta.emoji;
+      resLabel.textContent=meta.name;
+      resFill.style.width = Math.max(6, Math.min(100, Math.round(score*100))) + '%';
+      resFill.style.background = meta.color;
+      lastAnalyzed.textContent = 'Last: ' + new Date().toLocaleString();
+      confidencePill.textContent = 'Confidence: ' + Math.round(score*100) + '%';
+      chips.innerHTML='';
+      const list = Array.isArray(data.all_emotions) ? data.all_emotions : [];
+      rawLabelCount.textContent = list.length ? list.length : '—';
+      list.forEach(e=>{
+        const lab = canon(e.label||''); 
+        const m = EMO_META[lab]||{name:lab,emoji:'🙂',color:'#ddd'};
+        const chip = document.createElement('div'); 
+        chip.className='chip';
+        chip.innerHTML = `<span style="font-size:16px">${m.emoji}</span><span style="font-weight:600">${m.name}</span><span style="opacity:0.65;margin-left:8px">${Math.round((e.score||0)*100)}%</span>`;
+        chips.appendChild(chip);
+      });
+    }
+
+    function buildTrendChart(labels, values){
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      if(trendChart) trendChart.destroy();
+      trendChart = new Chart(ctx, {
+        type:'line', 
+        data:{
+          labels, 
+          datasets:[{
+            label:'Mood over time', 
+            data:values, 
+            borderColor:'rgba(124,58,237,0.9)', 
+            backgroundColor:'rgba(124,58,237,0.12)', 
+            fill:true, 
+            tension:0.32, 
+            pointRadius:4
+          }]
+        },
+        options:{
+          responsive:true, 
+          plugins:{legend:{display:false}}, 
+          scales:{
+            x:{ticks:{autoSkip:true,maxTicksLimit:8}}, 
+            y:{
+              min:0,
+              max:EMOTIONS.length-1,
+              ticks:{
+                stepSize:1,
+                callback: v => EMO_META[EMOTIONS[v]] ? EMO_META[EMOTIONS[v]].name : v
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function buildFreqChart(labels, dataVals, colors){
+      const ctx = document.getElementById('freqChart').getContext('2d');
+      if(freqChart) freqChart.destroy();
+      freqChart = new Chart(ctx, {
+        type:'bar', 
+        data:{
+          labels, 
+          datasets:[{
+            label:'Frequency', 
+            data:dataVals, 
+            backgroundColor:colors, 
+            borderRadius:8
+          }]
+        }, 
+        options:{
+          responsive:true, 
+          plugins:{legend:{display:false}}, 
+          scales:{
+            y:{beginAtZero:true,ticks:{precision:0}}
+          }
+        }
+      });
+    }
+
+    async function loadHistory(){
+      if (!currentUser) return;
+      
+      try{
+        const res = await fetch(API.history, {
+          credentials: 'include'
+        });
+        const payload = await safeJSON(res);
+        
+        // Handle authentication errors
+        if (payload && payload.error && payload.error.includes("Authentication")) {
+          currentUser = null;
+          updateUIForUser();
+          showAuthModal();
+          showToast('Please log in to view history');
+          return;
+        }
+        
+        if(payload && payload.error){ 
+          showToast('History load error'); 
+          return; 
+        }
+        
+        const entries = Array.isArray(payload) ? payload : [];
+        countPill.textContent = 'Entries: ' + entries.length;
+        historyList.innerHTML = '';
+        const chrono = entries.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+        chrono.slice().reverse().forEach(e=>{
+          const left = document.createElement('div'); 
+          left.className='left';
+          const txt = document.createElement('div'); 
+          txt.className='text'; 
+          txt.textContent = e.text||'';
+          const time = document.createElement('div'); 
+          time.className='time'; 
+          time.textContent = e.created_at ? new Date(e.created_at).toLocaleString() : '';
+          left.appendChild(txt);
+          const canonLab = canon(e.emotion || e.emotion_label || '');
+          const meta = EMO_META[canonLab] || {name:canonLab,color:'#94a3b8',emoji:'🙂'};
+          const badge = document.createElement('div'); 
+          badge.className='badge'; 
+          badge.style.background = meta.color; 
+          badge.style.color='#fff'; 
+          badge.textContent = meta.emoji + ' ' + meta.name;
+          const item = document.createElement('div'); 
+          item.className='entry'; 
+          item.appendChild(left);
+          const right = document.createElement('div'); 
+          right.style.display='flex'; 
+          right.style.flexDirection='column'; 
+          right.style.alignItems='flex-end';
+          right.appendChild(time); 
+          right.appendChild(badge); 
+          item.appendChild(right);
+          historyList.appendChild(item);
+        });
+
+        const times = chrono.map(e => e.created_at ? new Date(e.created_at).toLocaleString() : new Date().toLocaleString());
+        const values = chrono.map(e => { 
+          const lab = canon(e.emotion||e.emotion_label||''); 
+          return VALUE_OF[lab] !== undefined ? VALUE_OF[lab] : VALUE_OF['neutral']; 
+        });
+        const freq = EMOTIONS.map(k => chrono.reduce((s,e)=> s + (canon(e.emotion||e.emotion_label||'')===k ? 1 : 0), 0));
+        const labels = EMOTIONS.map(k => EMO_META[k] ? EMO_META[k].name : k);
+        const colors = EMOTIONS.map(k => EMO_META[k] ? EMO_META[k].color : '#94a3b8');
+        if(times.length) buildTrendChart(times, values); 
+        else buildTrendChart(['—'], [VALUE_OF['neutral']]);
+        buildFreqChart(labels, freq, colors);
+      } catch(err){ 
+        console.error('loadHistory', err); 
+        showToast('Failed to load history'); 
+      }
+    }
+
+    async function analyzeText(){
+      if (!currentUser) {
+        showAuthModal();
+        showToast('Please log in first');
+        return;
+      }
+      
+      const text = entryEl.value.trim();
+      if(!text){ 
+        showToast('Enter some text'); 
+        entryEl.focus(); 
+        return; 
+      }
+      
+      btnAnalyze.disabled = true; 
+      btnAnalyze.textContent = 'Analyzing...';
+      
+      try{
+        const r = await fetch(API.analyze, { 
+          method:'POST', 
+          headers:{'Content-Type':'application/json'}, 
+          body: JSON.stringify({ text }),
+          credentials: 'include'
+        });
+        
+        const data = await safeJSON(r);
+        
+        // Handle authentication errors
+        if (data && data.error && data.error.includes("Authentication")) {
+          currentUser = null;
+          updateUIForUser();
+          showAuthModal();
+          showToast('Please log in again');
+          return;
+        }
+        
+        if(data && data.error){ 
+          showToast(data.error || 'Analysis failed'); 
+          return; 
+        }
+        
+        renderResult(data); 
+        showToast('Analysis recorded'); 
+        entryEl.value=''; 
+        await loadHistory();
+      } catch(err){ 
+        console.error('analyzeText', err); 
+        showToast('Server error'); 
+      } finally { 
+        btnAnalyze.disabled=false; 
+        btnAnalyze.innerHTML='<i class="fa-solid fa-bolt"></i>&nbsp;Analyze'; 
+      }
+    }
+
+    // Event Listeners
+    btnAnalyze.addEventListener('click', analyzeText);
+    btnClear.addEventListener('click', ()=>{ 
+      entryEl.value=''; 
+      entryEl.focus(); 
+    });
+
+    // Initialize app
+    window.addEventListener('load', async ()=>{ 
+      await checkAuthStatus();
+      
+      // register service worker
+      if('serviceWorker' in navigator){
+        try{ 
+          await navigator.serviceWorker.register('/sw.js'); 
+          console.log('SW registered'); 
+        } catch(err){ 
+          console.warn('SW failed', err); 
+        }
+      }
+    });
   </script>
 </body>
 </html>

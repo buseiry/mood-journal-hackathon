@@ -7,7 +7,6 @@ const APP_SHELL = [
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'
 ];
 
-// Install event: cache app shell
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
@@ -15,12 +14,11 @@ self.addEventListener('install', event => {
   );
 });
 
-// Activate event: clean old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
     Promise.all([
       self.clients.claim(),
-      caches.keys().then(keys =>
+      caches.keys().then(keys => 
         Promise.all(
           keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
         )
@@ -29,19 +27,23 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch event: handle requests
 self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
-
-  // Do not cache API or auth requests
-  const noCachePaths = ['/analyze', '/history', '/login', '/signup', '/logout', '/user'];
-  if (req.method === 'POST' || noCachePaths.some(path => url.pathname.startsWith(path))) {
+  
+  // Don't cache any API calls, POST requests, or auth-related requests
+  if (req.method === 'POST' || 
+      url.pathname.startsWith('/analyze') || 
+      url.pathname.startsWith('/history') ||
+      url.pathname.startsWith('/login') ||
+      url.pathname.startsWith('/signup') ||
+      url.pathname.startsWith('/logout') ||
+      url.pathname.startsWith('/user')) {
     event.respondWith(fetch(req));
     return;
   }
 
-  // Navigation requests: network-first, fallback to cache
+  // For navigation requests, try network first, then cache
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).catch(() => caches.match('/'))
@@ -49,22 +51,31 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Other requests: cache-first strategy
+  // For all other requests, use cache-first strategy
   event.respondWith(
     caches.match(req).then(cached => {
+      // Return cached version if available
       if (cached) return cached;
-
+      
+      // Otherwise fetch from network
       return fetch(req).then(response => {
+        // Don't cache non-successful responses
         if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
-
+        
+        // Clone the response
         const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(req, responseToCache));
-
+        
+        // Add to cache for future visits
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(req, responseToCache);
+        });
+        
         return response;
       });
     }).catch(() => {
+      // Fallback for failed requests
       if (req.mode === 'navigate') return caches.match('/');
       return new Response('Network error happened', {
         status: 408,
