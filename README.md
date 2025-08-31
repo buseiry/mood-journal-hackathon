@@ -17,7 +17,7 @@ An intelligent web application that analyzes your journal entries in real-time u
 - **Backend**: Python (Flask)
 - **Database**: Supabase (PostgreSQL)
 - **AI**: Hugging Face Inference API
-- **Deployment**: Bolt.new
+- **Deployment**: Railway.app
 
 ## 📦 Installation & Setup
 Want to run this locally? Follow these steps:
