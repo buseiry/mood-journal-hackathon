@@ -44,9 +44,59 @@
     .entry .time{font-size:12px;color:var(--muted)}
     .badge{padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px}
     .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:28px;background:rgba(10,14,20,0.92);color:white;padding:12px 18px;border-radius:12px;font-weight:600;display:none;z-index:40}
+    
+    /* Auth Modal Styles */
+    .auth-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(7,16,40,0.92);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+    .auth-container{background:white;border-radius:16px;padding:28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+    .auth-tabs{display:flex;margin-bottom:22px;border-bottom:1px solid rgba(0,0,0,0.08)}
+    .auth-tab{flex:1;text-align:center;padding:12px;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:3px solid transparent}
+    .auth-tab.active{color:var(--accent1);border-bottom-color:var(--accent1)}
+    .auth-form{display:none}
+    .auth-form.active{display:block}
+    .auth-input{margin-bottom:16px}
+    .auth-input input{width:100%;padding:12px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:15px}
+    .auth-input input:focus{outline:none;border-color:var(--accent1)}
+    .auth-submit{width:100%;padding:12px;border-radius:10px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;border:0;font-weight:600;cursor:pointer;margin-top:8px}
+    .auth-error{margin-top:12px;padding:10px;background:#fee;border-radius:8px;color:#c33;font-size:14px;display:none}
+    .user-menu{display:flex;align-items:center;gap:10px;margin-left:auto}
+    .user-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent1);display:flex;align-items:center;justify-content:center;color:white;font-weight:600}
+    .user-email{font-size:13px;color:var(--muted)}
+    .logout-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px}
   </style>
 </head>
 <body>
+  <!-- Auth Modal -->
+  <div class="auth-modal" id="authModal" style="display: flex;">
+    <div class="auth-container">
+      <div class="auth-tabs">
+        <div class="auth-tab active" data-tab="login">Login</div>
+        <div class="auth-tab" data-tab="signup">Sign Up</div>
+      </div>
+      
+      <form class="auth-form active" id="loginForm">
+        <div class="auth-input">
+          <input type="email" id="loginEmail" placeholder="Email" required>
+        </div>
+        <div class="auth-input">
+          <input type="password" id="loginPassword" placeholder="Password" required>
+        </div>
+        <button type="submit" class="auth-submit">Login</button>
+        <div class="auth-error" id="loginError"></div>
+      </form>
+      
+      <form class="auth-form" id="signupForm">
+        <div class="auth-input">
+          <input type="email" id="signupEmail" placeholder="Email" required>
+        </div>
+        <div class="auth-input">
+          <input type="password" id="signupPassword" placeholder="Password" required>
+        </div>
+        <button type="submit" class="auth-submit">Create Account</button>
+        <div class="auth-error" id="signupError"></div>
+      </form>
+    </div>
+  </div>
+
   <div class="wrap">
     <div class="app">
       <div class="card">
@@ -56,41 +106,53 @@
             <h1>Mood Lab</h1>
             <p class="lead">Fast, clear emotion analysis. Works with your backend.</p>
           </div>
+          <div class="user-menu" id="userMenu" style="display:none">
+            <div class="user-avatar" id="userAvatar"></div>
+            <div class="user-email" id="userEmail"></div>
+            <button class="logout-btn" id="logoutBtn">Logout</button>
+          </div>
         </header>
 
-        <label for="entry" class="muted">Write a short journal entry or a line of text</label>
-        <textarea id="entry" placeholder="Type how you feel... Example: 'I got a promotion and I feel excited'"></textarea>
-
-        <div class="actions">
-          <button class="primary" id="btnAnalyze"><i class="fa-solid fa-bolt"></i>&nbsp;Analyze</button>
-          <button class="ghost" id="btnClear"><i class="fa-solid fa-eraser"></i>&nbsp;Clear</button>
-          <div style="flex:1"></div>
-          <div class="pill" id="countPill">Entries: —</div>
+        <div id="authRequired" style="text-align:center;padding:40px 0;">
+          <p>Please log in to use Mood Lab</p>
+          <button class="primary" id="showAuthBtn">Login / Sign Up</button>
         </div>
 
-        <div class="status-row" id="statusRow" style="display:none">
-          <div class="pill" id="lastAnalyzed">Last: —</div>
-          <div class="pill" id="confidencePill">Confidence: —</div>
-        </div>
+        <div id="appContent" style="display:none">
+          <label for="entry" class="muted">Write a short journal entry or a line of text</label>
+          <textarea id="entry" placeholder="Type how you feel... Example: 'I got a promotion and I feel excited'"></textarea>
 
-        <div class="result" id="resultArea" style="display:none">
-          <div class="big-emotion" aria-live="polite">
-            <div class="big-emoji" id="resEmoji">🙂</div>
-            <div class="big-label" id="resLabel">Neutral</div>
-            <div class="score-bar"><div class="score-fill" id="resFill"></div></div>
+          <div class="actions">
+            <button class="primary" id="btnAnalyze"><i class="fa-solid fa-bolt"></i>&nbsp;Analyze</button>
+            <button class="ghost" id="btnClear"><i class="fa-solid fa-eraser"></i>&nbsp;Clear</button>
+            <div style="flex:1"></div>
+            <div class="pill" id="countPill">Entries: —</div>
           </div>
 
-          <div style="flex:1">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div class="muted">Detected emotions</div>
-              <div class="muted" id="rawLabelCount">—</div>
+          <div class="status-row" id="statusRow" style="display:none">
+            <div class="pill" id="lastAnalyzed">Last: —</div>
+            <div class="pill" id="confidencePill">Confidence: —</div>
+          </div>
+
+          <div class="result" id="resultArea" style="display:none">
+            <div class="big-emotion" aria-live="polite">
+              <div class="big-emoji" id="resEmoji">🙂</div>
+              <div class="big-label" id="resLabel">Neutral</div>
+              <div class="score-bar"><div class="score-fill" id="resFill"></div></div>
             </div>
-            <div class="chips" id="chips"></div>
+
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div class="muted">Detected emotions</div>
+                <div class="muted" id="rawLabelCount">—</div>
+              </div>
+              <div class="chips" id="chips"></div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="right">
+      <div class="right" id="appRightPanel" style="display:none">
         <div class="panel">
           <h3>Recent history</h3>
           <div class="history-list" id="historyList" aria-live="polite"></div>
@@ -110,7 +172,14 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const API = { analyze: '/analyze', history: '/history' };
+    const API = { 
+      analyze: '/analyze', 
+      history: '/history',
+      login: '/login',
+      signup: '/signup',
+      logout: '/logout',
+      user: '/user'
+    };
 
     const CANON = { joy:'joy', happy:'joy', excited:'joy', surprise:'surprise', neutral:'neutral', sad:'sadness', sadness:'sadness', angry:'anger', anger:'anger', disgust:'disgust', fear:'fear' };
     const EMOTIONS = ['anger','disgust','fear','sadness','neutral','surprise','joy'];
@@ -125,6 +194,23 @@
     };
     const VALUE_OF = EMOTIONS.reduce((a,k,i)=> (a[k]=i,a), {});
 
+    // DOM Elements
+    const authModal = document.getElementById('authModal');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginError = document.getElementById('loginError');
+    const signupError = document.getElementById('signupError');
+    const authTabs = document.querySelectorAll('.auth-tab');
+    const authForms = document.querySelectorAll('.auth-form');
+    const showAuthBtn = document.getElementById('showAuthBtn');
+    const authRequired = document.getElementById('authRequired');
+    const appContent = document.getElementById('appContent');
+    const appRightPanel = document.getElementById('appRightPanel');
+    const userMenu = document.getElementById('userMenu');
+    const userAvatar = document.getElementById('userAvatar');
+    const userEmail = document.getElementById('userEmail');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
     const entryEl = document.getElementById('entry');
     const btnAnalyze = document.getElementById('btnAnalyze');
     const btnClear = document.getElementById('btnClear');
@@ -141,15 +227,194 @@
     const rawLabelCount = document.getElementById('rawLabelCount');
 
     let trendChart=null, freqChart=null;
+    let currentUser = null;
 
-    function showToast(msg, t=2500){ toastEl.textContent=msg; toastEl.style.display='block'; clearTimeout(window._t); window._t=setTimeout(()=>toastEl.style.display='none', t); }
+    // Authentication Functions
+    function showAuthModal() {
+      authModal.style.display = 'flex';
+    }
 
-    function canon(label){ if(!label) return 'neutral'; const k=String(label).toLowerCase().trim(); return CANON[k] || k; }
-    async function safeJSON(res){ return res.json().catch(()=>({error:'invalid json'})); }
+    function hideAuthModal() {
+      authModal.style.display = 'none';
+      loginError.style.display = 'none';
+      signupError.style.display = 'none';
+      loginForm.reset();
+      signupForm.reset();
+    }
+
+    function switchAuthTab(tabName) {
+      authTabs.forEach(tab => tab.classList.remove('active'));
+      authForms.forEach(form => form.classList.remove('active'));
+      
+      document.querySelector(`.auth-tab[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`${tabName}Form`).classList.add('active');
+    }
+
+    async function loginUser(email, password) {
+      try {
+        const response = await fetch(API.login, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          currentUser = data.user;
+          updateUIForUser();
+          hideAuthModal();
+          showToast('Login successful');
+          loadHistory();
+          return true;
+        } else {
+          loginError.textContent = data.error || 'Login failed';
+          loginError.style.display = 'block';
+          return false;
+        }
+      } catch (error) {
+        loginError.textContent = 'Network error. Please try again.';
+        loginError.style.display = 'block';
+        return false;
+      }
+    }
+
+    async function signupUser(email, password) {
+      try {
+        const response = await fetch(API.signup, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          currentUser = data.user;
+          updateUIForUser();
+          hideAuthModal();
+          showToast('Account created successfully');
+          loadHistory();
+          return true;
+        } else {
+          signupError.textContent = data.error || 'Signup failed';
+          signupError.style.display = 'block';
+          return false;
+        }
+      } catch (error) {
+        signupError.textContent = 'Network error. Please try again.';
+        signupError.style.display = 'block';
+        return false;
+      }
+    }
+
+    async function logoutUser() {
+      try {
+        await fetch(API.logout, { 
+          method: 'POST',
+          credentials: 'include'
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        currentUser = null;
+        updateUIForUser();
+        showToast('Logged out successfully');
+      }
+    }
+
+    async function checkAuthStatus() {
+      try {
+        const response = await fetch(API.user, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          currentUser = data.user;
+          updateUIForUser();
+          loadHistory();
+          return true;
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      }
+      
+      currentUser = null;
+      updateUIForUser();
+      return false;
+    }
+
+    function updateUIForUser() {
+      if (currentUser) {
+        authRequired.style.display = 'none';
+        appContent.style.display = 'block';
+        appRightPanel.style.display = 'flex';
+        userMenu.style.display = 'flex';
+        userAvatar.textContent = currentUser.email.charAt(0).toUpperCase();
+        userEmail.textContent = currentUser.email;
+        authModal.style.display = 'none';
+      } else {
+        authRequired.style.display = 'block';
+        appContent.style.display = 'none';
+        appRightPanel.style.display = 'none';
+        userMenu.style.display = 'none';
+        historyList.innerHTML = '';
+        countPill.textContent = 'Entries: —';
+        authModal.style.display = 'flex';
+      }
+    }
+
+    // Auth Event Listeners
+    authTabs.forEach(tab => {
+      tab.addEventListener('click', () => switchAuthTab(tab.dataset.tab));
+    });
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      await loginUser(email, password);
+    });
+
+    signupForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('signupEmail').value;
+      const password = document.getElementById('signupPassword').value;
+      await signupUser(email, password);
+    });
+
+    showAuthBtn.addEventListener('click', showAuthModal);
+    logoutBtn.addEventListener('click', logoutUser);
+
+    authModal.addEventListener('click', (e) => {
+      if (e.target === authModal) hideAuthModal();
+    });
+
+    // App Functions
+    function showToast(msg, t=2500){ 
+      toastEl.textContent=msg; 
+      toastEl.style.display='block'; 
+      clearTimeout(window._t); 
+      window._t=setTimeout(()=>toastEl.style.display='none', t); 
+    }
+
+    function canon(label){ 
+      if(!label) return 'neutral'; 
+      const k=String(label).toLowerCase().trim(); 
+      return CANON[k] || k; 
+    }
+    
+    async function safeJSON(res){ 
+      return res.json().catch(()=>({error:'invalid json'})); 
+    }
 
     function renderResult(data){
       if(!data || !data.emotion) return;
-      const raw = data.emotion; const label = canon(raw); const score = Number(data.score||0)/100;
+      const raw = data.emotion; 
+      const label = canon(raw); 
+      const score = Number(data.score||0)/100;
       const meta = EMO_META[label]||{name:label,emoji:'🙂',color:'#94a3b8'};
       resultArea.style.display='flex';
       resEmoji.textContent=meta.emoji;
@@ -162,8 +427,10 @@
       const list = Array.isArray(data.all_emotions) ? data.all_emotions : [];
       rawLabelCount.textContent = list.length ? list.length : '—';
       list.forEach(e=>{
-        const lab = canon(e.label||''); const m = EMO_META[lab]||{name:lab,emoji:'🙂',color:'#ddd'};
-        const chip = document.createElement('div'); chip.className='chip';
+        const lab = canon(e.label||''); 
+        const m = EMO_META[lab]||{name:lab,emoji:'🙂',color:'#ddd'};
+        const chip = document.createElement('div'); 
+        chip.className='chip';
         chip.innerHTML = `<span style="font-size:16px">${m.emoji}</span><span style="font-weight:600">${m.name}</span><span style="opacity:0.65;margin-left:8px">${Math.round((e.score||0)*100)}%</span>`;
         chips.appendChild(chip);
       });
@@ -173,97 +440,210 @@
       const ctx = document.getElementById('trendChart').getContext('2d');
       if(trendChart) trendChart.destroy();
       trendChart = new Chart(ctx, {
-        type:'line', data:{labels, datasets:[{label:'Mood over time', data:values, borderColor:'rgba(124,58,237,0.9)', backgroundColor:'rgba(124,58,237,0.12)', fill:true, tension:0.32, pointRadius:4}]},
-        options:{responsive:true, plugins:{legend:{display:false}}, scales:{x:{ticks:{autoSkip:true,maxTicksLimit:8}}, y:{min:0,max:EMOTIONS.length-1,ticks:{stepSize:1,callback:v=>EMO_META[EMOTIONS[v]]?EMO_META[EMOTIONS[v]].name:v}}}}
+        type:'line', 
+        data:{
+          labels, 
+          datasets:[{
+            label:'Mood over time', 
+            data:values, 
+            borderColor:'rgba(124,58,237,0.9)', 
+            backgroundColor:'rgba(124,58,237,0.12)', 
+            fill:true, 
+            tension:0.32, 
+            pointRadius:4
+          }]
+        },
+        options:{
+          responsive:true, 
+          plugins:{legend:{display:false}}, 
+          scales:{
+            x:{ticks:{autoSkip:true,maxTicksLimit:8}}, 
+            y:{
+              min:0,
+              max:EMOTIONS.length-1,
+              ticks:{
+                stepSize:1,
+                callback: v => EMO_META[EMOTIONS[v]] ? EMO_META[EMOTIONS[v]].name : v
+              }
+            }
+          }
+        }
       });
     }
 
     function buildFreqChart(labels, dataVals, colors){
       const ctx = document.getElementById('freqChart').getContext('2d');
       if(freqChart) freqChart.destroy();
-      freqChart = new Chart(ctx, {type:'bar', data:{labels, datasets:[{label:'Frequency', data:dataVals, backgroundColor:colors, borderRadius:8}]}, options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+      freqChart = new Chart(ctx, {
+        type:'bar', 
+        data:{
+          labels, 
+          datasets:[{
+            label:'Frequency', 
+            data:dataVals, 
+            backgroundColor:colors, 
+            borderRadius:8
+          }]
+        }, 
+        options:{
+          responsive:true, 
+          plugins:{legend:{display:false}}, 
+          scales:{
+            y:{beginAtZero:true,ticks:{precision:0}}
+          }
+        }
+      });
     }
 
     async function loadHistory(){
+      if (!currentUser) return;
+      
       try{
-        const res = await fetch(API.history);
+        const res = await fetch(API.history, {
+          credentials: 'include'
+        });
         const payload = await safeJSON(res);
-        if(payload && payload.error){ showToast('History load error'); return; }
+        
+        // Handle authentication errors
+        if (payload && payload.error && payload.error.includes("Authentication")) {
+          currentUser = null;
+          updateUIForUser();
+          showAuthModal();
+          showToast('Please log in to view history');
+          return;
+        }
+        
+        if(payload && payload.error){ 
+          showToast('History load error'); 
+          return; 
+        }
+        
         const entries = Array.isArray(payload) ? payload : [];
         countPill.textContent = 'Entries: ' + entries.length;
         historyList.innerHTML = '';
         const chrono = entries.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
         chrono.slice().reverse().forEach(e=>{
-          const left = document.createElement('div'); left.className='left';
-          const txt = document.createElement('div'); txt.className='text'; txt.textContent = e.text||'';
-          const time = document.createElement('div'); time.className='time'; time.textContent = e.created_at ? new Date(e.created_at).toLocaleString() : '';
+          const left = document.createElement('div'); 
+          left.className='left';
+          const txt = document.createElement('div'); 
+          txt.className='text'; 
+          txt.textContent = e.text||'';
+          const time = document.createElement('div'); 
+          time.className='time'; 
+          time.textContent = e.created_at ? new Date(e.created_at).toLocaleString() : '';
           left.appendChild(txt);
           const canonLab = canon(e.emotion || e.emotion_label || '');
           const meta = EMO_META[canonLab] || {name:canonLab,color:'#94a3b8',emoji:'🙂'};
-          const badge = document.createElement('div'); badge.className='badge'; badge.style.background = meta.color; badge.style.color='#fff'; badge.textContent = meta.emoji + ' ' + meta.name;
-          const item = document.createElement('div'); item.className='entry'; item.appendChild(left);
-          const right = document.createElement('div'); right.style.display='flex'; right.style.flexDirection='column'; right.style.alignItems='flex-end';
-          right.appendChild(time); right.appendChild(badge); item.appendChild(right);
+          const badge = document.createElement('div'); 
+          badge.className='badge'; 
+          badge.style.background = meta.color; 
+          badge.style.color='#fff'; 
+          badge.textContent = meta.emoji + ' ' + meta.name;
+          const item = document.createElement('div'); 
+          item.className='entry'; 
+          item.appendChild(left);
+          const right = document.createElement('div'); 
+          right.style.display='flex'; 
+          right.style.flexDirection='column'; 
+          right.style.alignItems='flex-end';
+          right.appendChild(time); 
+          right.appendChild(badge); 
+          item.appendChild(right);
           historyList.appendChild(item);
         });
 
         const times = chrono.map(e => e.created_at ? new Date(e.created_at).toLocaleString() : new Date().toLocaleString());
-        const values = chrono.map(e => { const lab = canon(e.emotion||e.emotion_label||''); return VALUE_OF[lab] !== undefined ? VALUE_OF[lab] : VALUE_OF['neutral']; });
+        const values = chrono.map(e => { 
+          const lab = canon(e.emotion||e.emotion_label||''); 
+          return VALUE_OF[lab] !== undefined ? VALUE_OF[lab] : VALUE_OF['neutral']; 
+        });
         const freq = EMOTIONS.map(k => chrono.reduce((s,e)=> s + (canon(e.emotion||e.emotion_label||'')===k ? 1 : 0), 0));
         const labels = EMOTIONS.map(k => EMO_META[k] ? EMO_META[k].name : k);
         const colors = EMOTIONS.map(k => EMO_META[k] ? EMO_META[k].color : '#94a3b8');
-        if(times.length) buildTrendChart(times, values); else buildTrendChart(['—'], [VALUE_OF['neutral']]);
+        if(times.length) buildTrendChart(times, values); 
+        else buildTrendChart(['—'], [VALUE_OF['neutral']]);
         buildFreqChart(labels, freq, colors);
-      }catch(err){ console.error('loadHistory', err); showToast('Failed to load history'); }
+      } catch(err){ 
+        console.error('loadHistory', err); 
+        showToast('Failed to load history'); 
+      }
     }
 
     async function analyzeText(){
+      if (!currentUser) {
+        showAuthModal();
+        showToast('Please log in first');
+        return;
+      }
+      
       const text = entryEl.value.trim();
-      if(!text){ showToast('Enter some text'); entryEl.focus(); return; }
-      btnAnalyze.disabled = true; btnAnalyze.textContent = 'Analyzing...';
+      if(!text){ 
+        showToast('Enter some text'); 
+        entryEl.focus(); 
+        return; 
+      }
+      
+      btnAnalyze.disabled = true; 
+      btnAnalyze.textContent = 'Analyzing...';
+      
       try{
-        if(!navigator.onLine){
-          queueOfflineAnalysis(text); showToast('Saved locally. Will sync when online.'); entryEl.value=''; await loadHistory(); return;
-        }
-        const r = await fetch(API.analyze, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
+        const r = await fetch(API.analyze, { 
+          method:'POST', 
+          headers:{'Content-Type':'application/json'}, 
+          body: JSON.stringify({ text }),
+          credentials: 'include'
+        });
+        
         const data = await safeJSON(r);
-        if(data && data.error){ showToast(data.error || 'Analysis failed'); return; }
-        renderResult(data); showToast('Analysis recorded'); entryEl.value=''; await loadHistory();
-      }catch(err){ console.error('analyzeText', err); showToast('Server error'); }
-      finally{ btnAnalyze.disabled=false; btnAnalyze.innerHTML='<i class="fa-solid fa-bolt"></i>&nbsp;Analyze'; }
-    }
-
-    btnAnalyze.addEventListener('click', analyzeText);
-    btnClear.addEventListener('click', ()=>{ entryEl.value=''; entryEl.focus(); });
-    window.addEventListener('load', ()=>{ flushQueue().then(()=> loadHistory()); });
-
-    // PWA offline queue helpers (localStorage)
-    const QUEUE_KEY = 'moodlab-offline-queue';
-    function queueOfflineAnalysis(text){ const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); q.push({ id:Date.now()+'-'+Math.random().toString(36).slice(2,8), text, ts:new Date().toISOString() }); localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
-    async function flushQueue(){
-      if(!navigator.onLine) return;
-      const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
-      if(!q.length) return;
-      for(const item of q.slice()){
-        try{
-          const resp = await fetch(API.analyze, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: item.text }) });
-          const json = await safeJSON(resp);
-          if(!json.error){
-            const newQ = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]').filter(x=> x.id !== item.id);
-            localStorage.setItem(QUEUE_KEY, JSON.stringify(newQ));
-          }
-        }catch(e){ console.warn('flushQueue fail', e); break; }
+        
+        // Handle authentication errors
+        if (data && data.error && data.error.includes("Authentication")) {
+          currentUser = null;
+          updateUIForUser();
+          showAuthModal();
+          showToast('Please log in again');
+          return;
+        }
+        
+        if(data && data.error){ 
+          showToast(data.error || 'Analysis failed'); 
+          return; 
+        }
+        
+        renderResult(data); 
+        showToast('Analysis recorded'); 
+        entryEl.value=''; 
+        await loadHistory();
+      } catch(err){ 
+        console.error('analyzeText', err); 
+        showToast('Server error'); 
+      } finally { 
+        btnAnalyze.disabled=false; 
+        btnAnalyze.innerHTML='<i class="fa-solid fa-bolt"></i>&nbsp;Analyze'; 
       }
     }
-    window.addEventListener('online', ()=>{ flushQueue().then(()=> loadHistory()); showToast('Back online. Syncing queued entries.'); });
 
-    // register service worker
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', async ()=> {
-        try{ await navigator.serviceWorker.register('/sw.js'); console.log('SW registered'); }
-        catch(err){ console.warn('SW failed', err); }
-      });
-    }
+    // Event Listeners
+    btnAnalyze.addEventListener('click', analyzeText);
+    btnClear.addEventListener('click', ()=>{ 
+      entryEl.value=''; 
+      entryEl.focus(); 
+    });
+
+    // Initialize app
+    window.addEventListener('load', async ()=>{ 
+      await checkAuthStatus();
+      
+      // register service worker
+      if('serviceWorker' in navigator){
+        try{ 
+          await navigator.serviceWorker.register('/sw.js'); 
+          console.log('SW registered'); 
+        } catch(err){ 
+          console.warn('SW failed', err); 
+        }
+      }
+    });
   </script>
 </body>
 </html>

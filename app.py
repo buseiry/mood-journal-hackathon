@@ -28,11 +28,11 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
 
 # Configure session cookies for production
 app.config.update(
-    SESSION_COOKIE_SECURE=True,    # Only send cookies over HTTPS
-    SESSION_COOKIE_HTTPONLY=True,  # Prevent JavaScript access to cookies
-    SESSION_COOKIE_SAMESITE='Lax', # Protect against CSRF
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
 )
-CORS(app, supports_credentials=True)  # Enable CORS with credentials
+CORS(app, supports_credentials=True, origins=["https://claritymind.up.railway.app"])
 
 SQL_CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS emotions (
@@ -107,6 +107,9 @@ def fallback_detect(text):
 def login():
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
         email = data.get('email')
         password = data.get('password')
         
@@ -137,6 +140,9 @@ def login():
 def signup():
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
         email = data.get('email')
         password = data.get('password')
         
@@ -150,7 +156,15 @@ def signup():
         })
         
         if hasattr(auth_response, 'user') and auth_response.user:
-            return jsonify({"message": "Signup successful. Please check your email for verification."})
+            # Also log the user in after signup
+            session['user'] = {
+                'id': str(auth_response.user.id),
+                'email': auth_response.user.email
+            }
+            return jsonify({
+                "message": "Signup successful", 
+                "user": session['user']
+            })
         else:
             return jsonify({"error": "Signup failed"}), 400
             
@@ -263,5 +277,4 @@ def get_history():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # bind to 0.0.0.0 so phone on LAN can reach it
     app.run(host='0.0.0.0', port=5000, debug=True)
