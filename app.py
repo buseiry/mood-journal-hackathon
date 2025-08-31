@@ -14,11 +14,15 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 HUGGING_FACE_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
 
+if not SUPABASE_URL or not SUPABASE_KEY:
+    logging.error("SUPABASE_URL or SUPABASE_KEY missing in environment.")
+    raise SystemExit("Set SUPABASE_URL and SUPABASE_KEY then restart")
+
 # Initialize Supabase client with error handling
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     # Test the connection
-    supabase.table("emotions").select("id").limit(1).execute()
+    result = supabase.table("emotions").select("id").limit(1).execute()
     logging.info("Supabase connection successful")
 except Exception as e:
     logging.error(f"Failed to connect to Supabase: {e}")
@@ -37,7 +41,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
 )
-CORS(app, supports_credentials=True, origins=["https://claritymind.up.railway.app"])
+CORS(app, supports_credentials=True, origins=["https://moodlab.up.railway.app"])
 
 SQL_CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS emotions (
@@ -133,6 +137,7 @@ def login():
                 'id': str(auth_response.user.id),
                 'email': auth_response.user.email
             }
+            logging.info(f"User logged in: {auth_response.user.email}")
             return jsonify({"message": "Login successful", "user": session['user']})
         else:
             return jsonify({"error": "Invalid credentials"}), 401
@@ -166,6 +171,7 @@ def signup():
                 'id': str(auth_response.user.id),
                 'email': auth_response.user.email
             }
+            logging.info(f"User signed up: {auth_response.user.email}")
             return jsonify({
                 "message": "Signup successful", 
                 "user": session['user']
@@ -180,6 +186,7 @@ def signup():
 @app.route('/logout', methods=['POST'])
 def logout():
     session.clear()
+    logging.info("User logged out")
     return jsonify({"message": "Logged out successfully"})
 
 @app.route('/user')
@@ -206,15 +213,13 @@ def service_worker():
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    if supabase is None:
-        return jsonify({"error": "Database not configured"}), 500
-        
     # Check authentication
     auth_error = require_auth()
     if auth_error:
         return auth_error
         
     user_id = session['user']['id']
+    logging.info(f"User ID from session: {user_id}")
     
     payload = request.get_json(silent=True)
     if payload and isinstance(payload, dict):
@@ -224,6 +229,8 @@ def analyze():
     if not user_input or not user_input.strip():
         return jsonify({"error": "No input provided"}), 400
     user_input = user_input.strip()
+    
+    logging.info(f"User input: {user_input}")
 
     detected = None
     if HF_HEADERS:
@@ -231,6 +238,8 @@ def analyze():
     if not detected:
         detected = fallback_detect(user_input)
     emotion_label, emotion_score, emotions = detected
+    
+    logging.info(f"Detected emotion: {emotion_label}, score: {emotion_score}")
 
     if not table_exists():
         logging.error("Supabase table 'emotions' missing. Provide SQL to create it.")
@@ -246,9 +255,17 @@ def analyze():
             "emotion": emotion_label, 
             "created_at": datetime.now(timezone.utc).isoformat()
         }
+        
+        logging.info(f"Attempting to insert data: {data}")
+        
         insert_response = supabase.table("emotions").insert(data).execute()
+        
+        logging.info(f"Insert response: {insert_response}")
+        
         if hasattr(insert_response, "error") and insert_response.error:
-            logging.error("Supabase insert error: %s", insert_response.error)
+            logging.error(f"Supabase insert error: {insert_response.error}")
+            return jsonify({"error": "Failed to insert to Supabase", "details": str(insert_response.error)}), 500
+            
     except Exception as e:
         logging.exception("Supabase insert failed")
         return jsonify({"error": "Failed to insert to Supabase", "details": str(e)}), 500
@@ -262,9 +279,6 @@ def analyze():
 
 @app.route('/history')
 def get_history():
-    if supabase is None:
-        return jsonify({"error": "Database not configured"}), 500
-        
     # Check authentication
     auth_error = require_auth()
     if auth_error:
