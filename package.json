@@ -1,0 +1,13 @@
+{
+  "name": "flask-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "echo 'Build completed - static files ready'",
+    "dev": "python app.py",
+    "start": "python app.py"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
