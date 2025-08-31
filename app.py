@@ -1,7 +1,8 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from datetime import datetime, timezone
+from flask_cors import CORS
 import requests
 import logging
 import os
@@ -23,10 +24,20 @@ HF_API_URL = "https://api-inference.huggingface.co/models/j-hartmann/emotion-eng
 HF_HEADERS = {"Authorization": f"Bearer {HUGGING_FACE_API_KEY}"} if HUGGING_FACE_API_KEY else None
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
+
+# Configure session cookies for production
+app.config.update(
+    SESSION_COOKIE_SECURE=True,    # Only send cookies over HTTPS
+    SESSION_COOKIE_HTTPONLY=True,  # Prevent JavaScript access to cookies
+    SESSION_COOKIE_SAMESITE='Lax', # Protect against CSRF
+)
+CORS(app, supports_credentials=True)  # Enable CORS with credentials
 
 SQL_CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS emotions (
   id bigserial PRIMARY KEY,
+  user_id UUID NOT NULL,
   text text NOT NULL,
   emotion text NOT NULL,
   created_at timestamptz DEFAULT now()
@@ -35,11 +46,12 @@ CREATE TABLE IF NOT EXISTS emotions (
 
 def table_exists():
     try:
-        r = supabase.table("emotions").select("text").limit(1).execute()
+        r = supabase.table("emotions").select("user_id").limit(1).execute()
         if hasattr(r, "data") and r.data is not None:
             return True
-        return True
-    except Exception:
+        return False
+    except Exception as e:
+        logging.error("Error checking table: %s", e)
         return False
 
 def detect_emotion_with_hf(text):
@@ -90,6 +102,80 @@ def fallback_detect(text):
     top = emotions[0]
     return top["label"], float(top["score"]), emotions
 
+# User authentication routes
+@app.route('/login', methods=['POST'])
+def login():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({"error": "Email and password required"}), 400
+        
+        # Sign in with Supabase Auth
+        auth_response = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password
+        })
+        
+        if hasattr(auth_response, 'user') and auth_response.user:
+            # Store user session
+            session['user'] = {
+                'id': str(auth_response.user.id),
+                'email': auth_response.user.email
+            }
+            return jsonify({"message": "Login successful", "user": session['user']})
+        else:
+            return jsonify({"error": "Invalid credentials"}), 401
+            
+    except Exception as e:
+        logging.error("Login error: %s", e)
+        return jsonify({"error": "Login failed"}), 500
+
+@app.route('/signup', methods=['POST'])
+def signup():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({"error": "Email and password required"}), 400
+        
+        # Create user with Supabase Auth
+        auth_response = supabase.auth.sign_up({
+            "email": email,
+            "password": password
+        })
+        
+        if hasattr(auth_response, 'user') and auth_response.user:
+            return jsonify({"message": "Signup successful. Please check your email for verification."})
+        else:
+            return jsonify({"error": "Signup failed"}), 400
+            
+    except Exception as e:
+        logging.error("Signup error: %s", e)
+        return jsonify({"error": "Signup failed"}), 500
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({"message": "Logged out successfully"})
+
+@app.route('/user')
+def get_user():
+    user = session.get('user')
+    if user:
+        return jsonify({"user": user})
+    return jsonify({"error": "Not authenticated"}), 401
+
+# Middleware to check authentication
+def require_auth():
+    if 'user' not in session:
+        return jsonify({"error": "Authentication required"}), 401
+    return None
+
 @app.route('/')
 def home():
     return render_template("index.html")
@@ -101,6 +187,13 @@ def service_worker():
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
+    # Check authentication
+    auth_error = require_auth()
+    if auth_error:
+        return auth_error
+        
+    user_id = session['user']['id']
+    
     payload = request.get_json(silent=True)
     if payload and isinstance(payload, dict):
         user_input = payload.get("text") or payload.get("journal_entry")
@@ -125,7 +218,12 @@ def analyze():
         }), 500
 
     try:
-        data = {"text": user_input, "emotion": emotion_label, "created_at": datetime.now(timezone.utc).isoformat()}
+        data = {
+            "user_id": user_id,
+            "text": user_input, 
+            "emotion": emotion_label, 
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
         insert_response = supabase.table("emotions").insert(data).execute()
         if hasattr(insert_response, "error") and insert_response.error:
             logging.error("Supabase insert error: %s", insert_response.error)
@@ -142,13 +240,21 @@ def analyze():
 
 @app.route('/history')
 def get_history():
+    # Check authentication
+    auth_error = require_auth()
+    if auth_error:
+        return auth_error
+        
+    user_id = session['user']['id']
+    
     if not table_exists():
         return jsonify({
             "error": "Supabase table 'emotions' missing. Create it with SQL.",
             "create_table_sql": SQL_CREATE_TABLE.strip()
         }), 500
     try:
-        response = supabase.table("emotions").select("text, emotion, created_at").order("created_at", desc=True).limit(50).execute()
+        # Only fetch entries for the current user
+        response = supabase.table("emotions").select("text, emotion, created_at").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute()
         if hasattr(response, "data"):
             return jsonify(response.data)
         return jsonify(response)
