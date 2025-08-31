@@ -1,6 +1,6 @@
 # Mood Journal - AI-Powered Emotion Tracker
 
-An intelligent web application that analyzes your journal entries in real-time using AI to help you understand and track your emotions. Built for the [Hackathon Name] Hackathon.
+An intelligent web application that analyzes your journal entries in real-time using AI to help you understand and track your emotions. Built for the vibe coding Hackathon.
 
 ## 🚀 Live Demo
 > **[Click here to experience the live app!](YOUR_LIVE_DEPLOYMENT_LINK_HERE)**
