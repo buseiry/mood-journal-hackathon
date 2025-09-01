@@ -22,8 +22,6 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 # Initialize Supabase client with error handling
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    # Test the connection
-    result = supabase.table("emotions").select("id").limit(1).execute()
     logging.info("Supabase connection successful")
 except Exception as e:
     logging.error(f"Failed to connect to Supabase: {e}")
@@ -43,35 +41,6 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax',
 )
 CORS(app, supports_credentials=True)
-
-SQL_CREATE_TABLE = """
-CREATE TABLE IF NOT EXISTS emotions (
-  id bigserial PRIMARY KEY,
-  user_id UUID NOT NULL,
-  text text NOT NULL,
-  emotion text NOT NULL,
-  message text,
-  created_at timestamptz DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS profiles (
-  id bigserial PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  premium boolean DEFAULT false,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-"""
-
-def table_exists():
-    try:
-        r = supabase.table("emotions").select("user_id").limit(1).execute()
-        if hasattr(r, "data") and r.data is not None:
-            return True
-        return False
-    except Exception as e:
-        logging.error("Error checking table: %s", e)
-        return False
 
 def detect_emotion_with_hf(text):
     try:
@@ -348,20 +317,13 @@ def analyze():
     
     logging.info(f"Detected emotion: {emotion_label}, score: {emotion_score}")
 
-    if not table_exists():
-        logging.error("Supabase table 'emotions' missing. Provide SQL to create it.")
-        return jsonify({
-            "error": "Supabase table 'emotions' missing. Create it with SQL.",
-            "create_table_sql": SQL_CREATE_TABLE.strip()
-        }), 500
-
     try:
         data = {
             "user_id": user_id,
             "text": user_input, 
             "emotion": emotion_label, 
-            "message": message,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "message": message
+            # Removed created_at as it's automatically set by the database
         }
         
         logging.info(f"Attempting to insert data: {data}")
@@ -394,20 +356,15 @@ def get_history():
         
     user_id = session['user']['id']
     
-    if not table_exists():
-        return jsonify({
-            "error": "Supabase table 'emotions' missing. Create it with SQL.",
-            "create_table_sql": SQL_CREATE_TABLE.strip()
-        }), 500
     try:
         # Only fetch entries for the current user
         response = supabase.table("emotions").select("text, emotion, message, created_at").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute()
         if hasattr(response, "data"):
             return jsonify(response.data)
-        return jsonify(response)
+        return jsonify({"error": "No data returned from Supabase"}), 500
     except Exception as e:
         logging.exception("Failed to fetch history")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=Tru
