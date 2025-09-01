@@ -6,6 +6,7 @@ from flask_cors import CORS
 import requests
 import logging
 import os
+import random
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -41,7 +42,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
 )
-CORS(app, supports_credentials=True, origins=["https://moodlab.up.railway.app"])
+CORS(app, supports_credentials=True)
 
 SQL_CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS emotions (
@@ -49,7 +50,16 @@ CREATE TABLE IF NOT EXISTS emotions (
   user_id UUID NOT NULL,
   text text NOT NULL,
   emotion text NOT NULL,
+  message text,
   created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS profiles (
+  id bigserial PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  premium boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 """
 
@@ -111,6 +121,46 @@ def fallback_detect(text):
     top = emotions[0]
     return top["label"], float(top["score"]), emotions
 
+def generate_motivational_message(emotion):
+    messages = {
+        "joy": [
+            "Your happiness is contagious! Keep spreading joy.",
+            "Wonderful! Remember this feeling on cloudy days.",
+            "Celebrate your joy—you deserve it!"
+        ],
+        "sadness": [
+            "It's okay to feel sad. This feeling will pass.",
+            "You are not alone. Better days are ahead.",
+            "Be gentle with yourself. You're doing the best you can."
+        ],
+        "anger": [
+            "Take a deep breath. You can handle this.",
+            "Anger is a natural emotion. Use it as fuel for positive change.",
+            "Try to step back and see the bigger picture."
+        ],
+        "fear": [
+            "Courage is not the absence of fear, but acting in spite of it.",
+            "You have overcome fears before. You can do it again.",
+            "Take small steps. You are braver than you think."
+        ],
+        "disgust": [
+            "Disgust can be a signal to change something. What can you learn?",
+            "Use this feeling to motivate positive action.",
+            "Sometimes, disgust protects us from harm. Listen to it."
+        ],
+        "surprise": [
+            "Embrace the unexpected! It can lead to new opportunities.",
+            "Life is full of surprises. Stay open to them.",
+            "A surprise can be a gift in disguise."
+        ],
+        "neutral": [
+            "Every day is a new beginning. What will you do today?",
+            "Balance is key. Enjoy the calm moments.",
+            "Neutral feelings are okay. They give you space to reflect."
+        ]
+    }
+    return random.choice(messages.get(emotion, ["You are doing great. Keep it up!"]))
+
 # User authentication routes
 @app.route('/login', methods=['POST'])
 def login():
@@ -137,6 +187,23 @@ def login():
                 'id': str(auth_response.user.id),
                 'email': auth_response.user.email
             }
+            
+            # Check if user has premium status
+            try:
+                profile_response = supabase.table("profiles").select("premium").eq("user_id", auth_response.user.id).execute()
+                if hasattr(profile_response, "data") and profile_response.data and len(profile_response.data) > 0:
+                    session['user']['premium'] = profile_response.data[0]['premium']
+                else:
+                    # Create profile if it doesn't exist
+                    supabase.table("profiles").insert({
+                        "user_id": auth_response.user.id,
+                        "premium": False
+                    }).execute()
+                    session['user']['premium'] = False
+            except Exception as e:
+                logging.error(f"Error checking premium status: {e}")
+                session['user']['premium'] = False
+                
             logging.info(f"User logged in: {auth_response.user.email}")
             return jsonify({"message": "Login successful", "user": session['user']})
         else:
@@ -171,6 +238,18 @@ def signup():
                 'id': str(auth_response.user.id),
                 'email': auth_response.user.email
             }
+            
+            # Create user profile
+            try:
+                supabase.table("profiles").insert({
+                    "user_id": auth_response.user.id,
+                    "premium": False
+                }).execute()
+                session['user']['premium'] = False
+            except Exception as e:
+                logging.error(f"Error creating profile: {e}")
+                session['user']['premium'] = False
+                
             logging.info(f"User signed up: {auth_response.user.email}")
             return jsonify({
                 "message": "Signup successful", 
@@ -195,6 +274,31 @@ def get_user():
     if user:
         return jsonify({"user": user})
     return jsonify({"error": "Not authenticated"}), 401
+
+@app.route('/upgrade', methods=['POST'])
+def upgrade_to_premium():
+    # Check authentication
+    auth_error = require_auth()
+    if auth_error:
+        return auth_error
+        
+    user_id = session['user']['id']
+    
+    try:
+        # Update user's premium status
+        response = supabase.table("profiles").update({"premium": True}).eq("user_id", user_id).execute()
+        
+        if hasattr(response, "error") and response.error:
+            logging.error(f"Upgrade error: {response.error}")
+            return jsonify({"error": "Upgrade failed"}), 500
+            
+        # Update session
+        session['user']['premium'] = True
+        
+        return jsonify({"message": "Upgraded to premium successfully"})
+    except Exception as e:
+        logging.exception("Failed to upgrade to premium")
+        return jsonify({"error": str(e)}), 500
 
 # Middleware to check authentication
 def require_auth():
@@ -239,6 +343,9 @@ def analyze():
         detected = fallback_detect(user_input)
     emotion_label, emotion_score, emotions = detected
     
+    # Generate motivational message
+    message = generate_motivational_message(emotion_label)
+    
     logging.info(f"Detected emotion: {emotion_label}, score: {emotion_score}")
 
     if not table_exists():
@@ -253,6 +360,7 @@ def analyze():
             "user_id": user_id,
             "text": user_input, 
             "emotion": emotion_label, 
+            "message": message,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
@@ -273,7 +381,7 @@ def analyze():
     return jsonify({
         "emotion": emotion_label,
         "score": int(emotion_score * 100),
-        "message": "Mood recorded successfully",
+        "message": message,
         "all_emotions": emotions
     })
 
@@ -293,7 +401,7 @@ def get_history():
         }), 500
     try:
         # Only fetch entries for the current user
-        response = supabase.table("emotions").select("text, emotion, created_at").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute()
+        response = supabase.table("emotions").select("text, emotion, message, created_at").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute()
         if hasattr(response, "data"):
             return jsonify(response.data)
         return jsonify(response)

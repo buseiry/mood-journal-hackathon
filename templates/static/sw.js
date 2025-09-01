@@ -38,7 +38,8 @@ self.addEventListener('fetch', event => {
       url.pathname.startsWith('/login') ||
       url.pathname.startsWith('/signup') ||
       url.pathname.startsWith('/logout') ||
-      url.pathname.startsWith('/user')) {
+      url.pathname.startsWith('/user') ||
+      url.pathname.startsWith('/upgrade')) {
     event.respondWith(fetch(req));
     return;
   }

@@ -45,6 +45,29 @@
     .badge{padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px}
     .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:28px;background:rgba(10,14,20,0.92);color:white;padding:12px 18px;border-radius:12px;font-weight:600;display:none;z-index:40}
     
+    /* Motivational message */
+    .motivational-message {
+      margin-top: 12px;
+      padding: 10px;
+      background: rgba(124, 58, 237, 0.05);
+      border-radius: 8px;
+      font-style: italic;
+      color: var(--muted);
+      text-align: center;
+      width: 100%;
+    }
+    
+    /* Premium badge */
+    .premium-badge {
+      background: linear-gradient(90deg, #ffd700, #ffed4e);
+      color: #8b6914;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    
     /* Auth Modal Styles */
     .auth-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(7,16,40,0.92);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
     .auth-container{background:white;border-radius:16px;padding:28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
@@ -111,6 +134,9 @@
             <div class="user-email" id="userEmail"></div>
             <button class="logout-btn" id="logoutBtn">Logout</button>
           </div>
+          <div id="premiumSection" style="display: none;">
+            <button class="primary" id="btnUpgrade">Go Premium</button>
+          </div>
         </header>
 
         <div id="authRequired" style="text-align:center;padding:40px 0;">
@@ -149,6 +175,9 @@
               <div class="chips" id="chips"></div>
             </div>
           </div>
+          
+          <!-- Motivational message container -->
+          <div class="motivational-message" id="motivationalMessage"></div>
         </div>
       </div>
 
@@ -178,7 +207,8 @@
       login: '/login',
       signup: '/signup',
       logout: '/logout',
-      user: '/user'
+      user: '/user',
+      upgrade: '/upgrade'
     };
 
     const CANON = { joy:'joy', happy:'joy', excited:'joy', surprise:'surprise', neutral:'neutral', sad:'sadness', sadness:'sadness', angry:'anger', anger:'anger', disgust:'disgust', fear:'fear' };
@@ -210,6 +240,8 @@
     const userAvatar = document.getElementById('userAvatar');
     const userEmail = document.getElementById('userEmail');
     const logoutBtn = document.getElementById('logoutBtn');
+    const premiumSection = document.getElementById('premiumSection');
+    const btnUpgrade = document.getElementById('btnUpgrade');
     
     const entryEl = document.getElementById('entry');
     const btnAnalyze = document.getElementById('btnAnalyze');
@@ -225,6 +257,7 @@
     const lastAnalyzed = document.getElementById('lastAnalyzed');
     const confidencePill = document.getElementById('confidencePill');
     const rawLabelCount = document.getElementById('rawLabelCount');
+    const motivationalMessage = document.getElementById('motivationalMessage');
 
     let trendChart=null, freqChart=null;
     let currentUser = null;
@@ -325,6 +358,30 @@
       }
     }
 
+    async function upgradeToPremium() {
+      try {
+        const response = await fetch(API.upgrade, {
+          method: 'POST',
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          currentUser.premium = true;
+          updateUIForUser();
+          showToast('You are now a premium user!');
+          return true;
+        } else {
+          showToast(data.error || 'Upgrade failed');
+          return false;
+        }
+      } catch (error) {
+        showToast('Network error during upgrade');
+        return false;
+      }
+    }
+
     async function checkAuthStatus() {
       try {
         const response = await fetch(API.user, {
@@ -353,13 +410,23 @@
         appRightPanel.style.display = 'flex';
         userMenu.style.display = 'flex';
         userAvatar.textContent = currentUser.email.charAt(0).toUpperCase();
-        userEmail.textContent = currentUser.email;
+        
+        // Add premium badge if user is premium
+        if (currentUser.premium) {
+          userEmail.innerHTML = `${currentUser.email} <span class="premium-badge">PREMIUM</span>`;
+          premiumSection.style.display = 'none';
+        } else {
+          userEmail.textContent = currentUser.email;
+          premiumSection.style.display = 'flex';
+        }
+        
         authModal.style.display = 'none';
       } else {
         authRequired.style.display = 'block';
         appContent.style.display = 'none';
         appRightPanel.style.display = 'none';
         userMenu.style.display = 'none';
+        premiumSection.style.display = 'none';
         historyList.innerHTML = '';
         countPill.textContent = 'Entries: —';
         authModal.style.display = 'flex';
@@ -387,6 +454,7 @@
 
     showAuthBtn.addEventListener('click', showAuthModal);
     logoutBtn.addEventListener('click', logoutUser);
+    btnUpgrade.addEventListener('click', upgradeToPremium);
 
     authModal.addEventListener('click', (e) => {
       if (e.target === authModal) hideAuthModal();
@@ -434,6 +502,14 @@
         chip.innerHTML = `<span style="font-size:16px">${m.emoji}</span><span style="font-weight:600">${m.name}</span><span style="opacity:0.65;margin-left:8px">${Math.round((e.score||0)*100)}%</span>`;
         chips.appendChild(chip);
       });
+      
+      // Display motivational message
+      if (data.message) {
+        motivationalMessage.textContent = data.message;
+        motivationalMessage.style.display = 'block';
+      } else {
+        motivationalMessage.style.display = 'none';
+      }
     }
 
     function buildTrendChart(labels, values){
