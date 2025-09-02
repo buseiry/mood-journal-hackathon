@@ -1,61 +1,35 @@
 # Mood Journal - AI-Powered Emotion Tracker
 
-An intelligent web application that analyzes your journal entries in real-time using AI to help you understand and track your emotions. Built for the vibe coding Hackathon.
-
+A full-stack web application that helps users track and understand their emotions through AI-powered journaling.
 ## 🚀 Live Demo
-> **[Click here to experience the live app!](YOUR_LIVE_DEPLOYMENT_LINK_HERE)**
-*(We will add this link after the next step)*
 
+Experience the application live: [https://mood-journal-hackathon.onrender.com](https://mood-journal-hackathon.onrender.com)
+
+## 📹 Video Demo
+
+Watch a quick 2-minute demo: [YouTube Demo Video](https://youtu.be/iWMyuKGKUkA
 ## ✨ Features
-- **AI-Powered Analysis**: Utilizes the Hugging Face `emotion-english-distilroberta-base` model for accurate sentiment analysis.
-- **Interactive History**: View your past entries and mood trends.
-- **Beautiful Visualization**: See your emotional data presented in an intuitive chart.
-- **Secure & Private**: Your entries are stored securely in a Supabase database.
+
+- **AI-Powered Emotion Analysis**: Automatically detects emotions from journal entries using Hugging Face's sentiment analysis API.
+- **Personalized Motivational Messages**: Receives encouraging, AI-generated messages based on detected emotions.
+- **Beautiful Data Visualization**: View mood trends and patterns over time with interactive Chart.js graphs.
+- **User Authentication**: Secure signup and login functionality with session management.
+- **Responsive Design**: Works seamlessly on desktop and mobile devices.
 
 ## 🛠️ Tech Stack
-- **Frontend**: HTML5, CSS3, JavaScript (Chart.js)
-- **Backend**: Python (Flask)
-- **Database**: Supabase (PostgreSQL)
-- **AI**: Hugging Face Inference API
-- **Deployment**: Railway.app
+
+- **Frontend**: HTML5, CSS3, JavaScript (with Chart.js for visualizations)
+- **Backend**: Python with Flask framework
+- **Database**: Supabase with Row-Level Security
+- **AI Integration**: Hugging Face Sentiment Analysis API
+- **Deployment**: Render cloud platform
+- **Authentication**: Supabase Auth
 
 ## 📦 Installation & Setup
-Want to run this locally? Follow these steps:
 
-1.  **Clone the repository**
-    ```bash
-    git clone https://github.com/buseiry/mood-journal-hackathon.git
-    cd mood-journal-hackathon
-    ```
+To run this project locally:
 
-2.  **Install Python dependencies**
-    ```bash
-    pip install flask supabase python-dotenv requests
-    ```
-
-3.  **Set up environment variables**
-    Create a `.env` file in the root directory and add your keys:
-    ```bash
-    SUPABASE_URL=your_supabase_project_url
-    SUPABASE_KEY=your_supabase_anon_key
-    HUGGING_FACE_API_KEY=your_hugging_face_api_token
-    ```
-
-4.  **Run the application**
-    ```bash
-    python app.py
-    ```
-    Open your browser and go to `http://localhost:5000`
-
-## 📸 Screenshots
-*(We can add screenshots of your app here later)*
-
-## 🙋‍♂️ Author
-**Buseiry**  
-- GitHub: [@buseiry](https://github.com/buseiry)
-- Project Link: [https://github.com/buseiry/mood-journal-hackathon](https://github.com/buseiry/mood-journal-hackathon)
-
-## 🙏 Acknowledgments
-- Hugging Face for their incredible emotion analysis model.
-- Supabase for the easy-to-use database platform.
-- The hackathon organizers for the opportunity.
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/buseiry/mood-journal-hackathon.git
+   cd mood-journal-hackathon
